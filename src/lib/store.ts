@@ -1,18 +1,17 @@
 import { CalculationResult } from "./calculations";
 
 const HISTORY_KEY = "pneumaflow_history";
-const EMAIL_KEY = "pneumaflow_email";
 
 export function getEmail(): string | null {
-  return localStorage.getItem(EMAIL_KEY);
+  return "unlocked";
 }
 
 export function setEmail(email: string): void {
-  localStorage.setItem(EMAIL_KEY, email);
+  localStorage.setItem("pneumaflow_email", email);
 }
 
 export function isUnlocked(): boolean {
-  return !!getEmail();
+  return true;
 }
 
 export function getHistory(): CalculationResult[] {
