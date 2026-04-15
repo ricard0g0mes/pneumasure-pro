@@ -9,17 +9,20 @@ import {
   CalculationType,
   CalculationResult,
   formatResult,
+  unitGroups,
+  convertToBase,
+  convertFromBase,
 } from "@/lib/calculations";
-import { addToHistory, isUnlocked } from "@/lib/store";
-import EmailUnlockModal from "@/components/EmailUnlockModal";
+import { addToHistory } from "@/lib/store";
 import { useNavigate } from "react-router-dom";
 
 export default function Index() {
   const navigate = useNavigate();
   const [selectedType, setSelectedType] = useState<CalculationType | "">("");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
+  const [resultUnit, setResultUnit] = useState<string>("");
   const [result, setResult] = useState<CalculationResult | null>(null);
-  const [showUnlock, setShowUnlock] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -33,10 +36,21 @@ export default function Index() {
     setValues({});
     setResult(null);
     setShowSuccess(false);
+    const cfg = calculations.find((c) => c.id === type);
+    if (cfg) {
+      const units: Record<string, string> = {};
+      cfg.params.forEach((p) => {
+        units[p.id] = p.defaultUnit;
+      });
+      setSelectedUnits(units);
+      setResultUnit(cfg.resultParam.defaultUnit);
+    }
   };
 
   const allFieldsFilled = config
-    ? config.fields.every((f) => values[f.id] && !isNaN(Number(values[f.id])) && Number(values[f.id]) > 0)
+    ? config.params.every(
+        (f) => values[f.id] && !isNaN(Number(values[f.id])) && Number(values[f.id]) > 0
+      )
     : false;
 
   const handleCalculate = () => {
@@ -44,25 +58,37 @@ export default function Index() {
     setCalculating(true);
 
     setTimeout(() => {
-      const numericValues: Record<string, number> = {};
+      // Convert all inputs to base units
+      const baseValues: Record<string, number> = {};
       const inputLabels: Record<string, string> = {};
       const inputUnits: Record<string, string> = {};
-      config.fields.forEach((f) => {
-        numericValues[f.id] = Number(values[f.id]);
-        inputLabels[f.id] = f.label;
-        inputUnits[f.id] = f.unit;
+      config.params.forEach((p) => {
+        const raw = Number(values[p.id]);
+        const unit = selectedUnits[p.id] || p.defaultUnit;
+        // For percentage, don't convert
+        if (p.unitGroup === "percentage" || p.unitGroup === "rate") {
+          baseValues[p.id] = raw;
+        } else {
+          baseValues[p.id] = convertToBase(raw, p.unitGroup, unit);
+        }
+        inputLabels[p.id] = p.label;
+        inputUnits[p.id] = unit;
       });
+
+      const baseResult = config.calculate(baseValues);
 
       const calcResult: CalculationResult = {
         id: crypto.randomUUID(),
         type: config.id,
         typeName: config.name,
-        inputs: numericValues,
+        inputs: Object.fromEntries(
+          config.params.map((p) => [p.id, Number(values[p.id])])
+        ),
         inputLabels,
         inputUnits,
-        result: config.calculate(numericValues),
-        resultLabel: config.resultLabel,
-        resultUnit: config.resultUnit,
+        result: baseResult,
+        resultLabel: config.resultParam.label,
+        resultUnit: config.resultParam.defaultUnit,
         timestamp: new Date(),
       };
 
@@ -71,8 +97,42 @@ export default function Index() {
       setCalculating(false);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 2000);
-    }, 400);
+    }, 300);
   };
+
+  // Get result in currently selected display unit
+  const displayResult = useMemo(() => {
+    if (!result || !config) return null;
+    const ug = config.resultParam.unitGroup;
+    const unit = resultUnit || config.resultParam.defaultUnit;
+    if (ug === "percentage" || ug === "rate") return result.result;
+    return convertFromBase(result.result, ug, unit);
+  }, [result, config, resultUnit]);
+
+  // All result unit conversions
+  const allResultConversions = useMemo(() => {
+    if (!result || !config) return [];
+    const ug = config.resultParam.unitGroup;
+    const group = unitGroups[ug];
+    if (!group) return [];
+    return group.units.map((u) => ({
+      unit: u.id,
+      label: u.label,
+      value: ug === "percentage" || ug === "rate"
+        ? result.result
+        : convertFromBase(result.result, ug, u.id),
+    }));
+  }, [result, config]);
+
+  // Group calculations by category
+  const categories = useMemo(() => {
+    const cats: Record<string, typeof calculations> = {};
+    calculations.forEach((c) => {
+      if (!cats[c.category]) cats[c.category] = [];
+      cats[c.category].push(c);
+    });
+    return cats;
+  }, []);
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -98,10 +158,14 @@ export default function Index() {
             className="w-full h-12 px-4 pr-10 rounded-lg border bg-card text-foreground text-sm font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
           >
             <option value="">Choose a calculation...</option>
-            {calculations.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+            {Object.entries(categories).map(([cat, calcs]) => (
+              <optgroup key={cat} label={cat}>
+                {calcs.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -122,32 +186,62 @@ export default function Index() {
             <p className="text-sm text-muted-foreground">{config.description}</p>
 
             <div className="grid gap-4">
-              {config.fields.map((field, i) => (
-                <motion.div
-                  key={field.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.06, duration: 0.25, ease: "easeOut" }}
-                  className="space-y-1.5"
-                >
-                  <Label htmlFor={field.id} className="text-sm font-medium">
-                    {field.label}{" "}
-                    <span className="text-muted-foreground font-normal">({field.unit})</span>
-                  </Label>
-                  <Input
-                    id={field.id}
-                    type="number"
-                    placeholder={field.placeholder}
-                    min={field.min ?? 0}
-                    step="any"
-                    value={values[field.id] || ""}
-                    onChange={(e) =>
-                      setValues((prev) => ({ ...prev, [field.id]: e.target.value }))
-                    }
-                    className="h-12"
-                  />
-                </motion.div>
-              ))}
+              {config.params.map((field, i) => {
+                const group = unitGroups[field.unitGroup];
+                const hasMultipleUnits = group && group.units.length > 1;
+                return (
+                  <motion.div
+                    key={field.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.06, duration: 0.25, ease: "easeOut" }}
+                    className="space-y-1.5"
+                  >
+                    <Label htmlFor={field.id} className="text-sm font-medium">
+                      {field.label}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id={field.id}
+                        type="number"
+                        placeholder={field.placeholder}
+                        min={field.min ?? 0}
+                        step="any"
+                        value={values[field.id] || ""}
+                        onChange={(e) =>
+                          setValues((prev) => ({ ...prev, [field.id]: e.target.value }))
+                        }
+                        className="h-12 flex-1"
+                      />
+                      {hasMultipleUnits ? (
+                        <div className="relative">
+                          <select
+                            value={selectedUnits[field.id] || field.defaultUnit}
+                            onChange={(e) =>
+                              setSelectedUnits((prev) => ({
+                                ...prev,
+                                [field.id]: e.target.value,
+                              }))
+                            }
+                            className="h-12 px-3 pr-8 rounded-lg border bg-secondary text-secondary-foreground text-sm font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring transition-shadow min-w-[80px]"
+                          >
+                            {group.units.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.label}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                        </div>
+                      ) : (
+                        <div className="h-12 px-3 rounded-lg border bg-secondary flex items-center text-sm font-medium text-muted-foreground min-w-[60px] justify-center">
+                          {group?.units[0]?.label || field.defaultUnit}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
 
             <Button
@@ -174,7 +268,7 @@ export default function Index() {
 
       {/* Result */}
       <AnimatePresence>
-        {result && (
+        {result && config && displayResult !== null && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -182,6 +276,7 @@ export default function Index() {
             transition={{ duration: 0.35, ease: "easeOut" }}
             className="rounded-xl border bg-card p-8 space-y-6"
           >
+            {/* Primary result */}
             <div className="text-center space-y-1">
               {showSuccess && (
                 <motion.div
@@ -194,38 +289,67 @@ export default function Index() {
               )}
               <p className="text-sm text-muted-foreground">{result.resultLabel}</p>
               <p className="text-4xl font-bold tracking-tight text-foreground">
-                {formatResult(result.result)}
+                {formatResult(displayResult)}
               </p>
-              <p className="text-sm font-medium text-primary">{result.resultUnit}</p>
+              {/* Result unit selector */}
+              {allResultConversions.length > 1 ? (
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <select
+                    value={resultUnit}
+                    onChange={(e) => setResultUnit(e.target.value)}
+                    className="px-3 py-1.5 rounded-md border bg-secondary text-sm font-medium text-primary appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {allResultConversions.map((c) => (
+                      <option key={c.unit} value={c.unit}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-primary">{resultUnit}</p>
+              )}
             </div>
 
             <p className="text-center text-sm text-muted-foreground">
               Calculation complete. Precision achieved.
             </p>
 
-            {!isUnlocked() && (
-              <div className="pt-2 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowUnlock(true)}
-                  className="w-full h-11 animate-pulse-subtle"
-                >
-                  Unlock History & Export
-                </Button>
+            {/* All unit conversions */}
+            {allResultConversions.length > 1 && (
+              <div className="border-t pt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                  Result in all units
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {allResultConversions.map((c) => (
+                    <div
+                      key={c.unit}
+                      className={`rounded-lg border p-3 text-center transition-colors ${
+                        c.unit === resultUnit
+                          ? "bg-primary/5 border-primary/20"
+                          : "bg-secondary/50"
+                      }`}
+                    >
+                      <p className="text-base font-semibold text-foreground">
+                        {formatResult(c.value)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{c.label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {isUnlocked() && (
-              <div className="pt-2 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/history")}
-                  className="w-full h-11"
-                >
-                  View History
-                </Button>
-              </div>
-            )}
+            <div className="pt-2 border-t">
+              <Button
+                variant="outline"
+                onClick={() => navigate("/history")}
+                className="w-full h-11"
+              >
+                View History
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -237,15 +361,6 @@ export default function Index() {
           <p>Select a calculation type above to get started.</p>
         </div>
       )}
-
-      <EmailUnlockModal
-        open={showUnlock}
-        onClose={() => setShowUnlock(false)}
-        onUnlocked={() => {
-          setShowUnlock(false);
-          navigate("/history");
-        }}
-      />
     </div>
   );
 }
