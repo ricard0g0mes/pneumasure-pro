@@ -208,6 +208,65 @@ export const calculations: CalculationConfig[] = [
       return pressurePa / 1e5; // bar
     },
   },
+  // ─── Cylinder Advance Speed ───
+  {
+    id: "cylinder-advance-speed",
+    name: "Cylinder Advance Speed",
+    category: "Cylinder",
+    description: "Calculate piston advance speed from flow rate and bore diameter.",
+    params: [
+      { id: "flowRate", label: "Flow Rate", unitGroup: "flowRate", defaultUnit: "L/min", placeholder: "e.g. 20" },
+      { id: "bore", label: "Bore Diameter", unitGroup: "length", defaultUnit: "mm", placeholder: "e.g. 50" },
+    ],
+    resultParam: { label: "Advance Speed", unitGroup: "speed", defaultUnit: "mm/s" },
+    calculate: (v) => {
+      // flowRate in L/min (base), bore in mm (base)
+      const areaM2 = Math.PI * Math.pow(v.bore / 1000 / 2, 2);
+      const flowM3s = v.flowRate / (1000 * 60); // L/min -> m³/s
+      const speedMs = flowM3s / areaM2;
+      return speedMs * 1000; // mm/s
+    },
+  },
+  // ─── Cylinder Retract Speed ───
+  {
+    id: "cylinder-retract-speed",
+    name: "Cylinder Retract Speed",
+    category: "Cylinder",
+    description: "Calculate piston retract speed from flow rate, bore and rod diameter.",
+    params: [
+      { id: "flowRate", label: "Flow Rate", unitGroup: "flowRate", defaultUnit: "L/min", placeholder: "e.g. 20" },
+      { id: "bore", label: "Bore Diameter", unitGroup: "length", defaultUnit: "mm", placeholder: "e.g. 50" },
+      { id: "rod", label: "Rod Diameter", unitGroup: "length", defaultUnit: "mm", placeholder: "e.g. 20" },
+    ],
+    resultParam: { label: "Retract Speed", unitGroup: "speed", defaultUnit: "mm/s" },
+    calculate: (v) => {
+      const boreAreaM2 = Math.PI * Math.pow(v.bore / 1000 / 2, 2);
+      const rodAreaM2 = Math.PI * Math.pow(v.rod / 1000 / 2, 2);
+      const annularAreaM2 = boreAreaM2 - rodAreaM2;
+      const flowM3s = v.flowRate / (1000 * 60);
+      const speedMs = flowM3s / annularAreaM2;
+      return speedMs * 1000; // mm/s
+    },
+  },
+  // ─── Required Flow Rate ───
+  {
+    id: "cylinder-required-flow",
+    name: "Required Flow Rate",
+    category: "Cylinder",
+    description: "Calculate required flow rate for a desired cylinder speed.",
+    params: [
+      { id: "bore", label: "Bore Diameter", unitGroup: "length", defaultUnit: "mm", placeholder: "e.g. 50" },
+      { id: "speed", label: "Desired Speed", unitGroup: "speed", defaultUnit: "mm/s", placeholder: "e.g. 200" },
+    ],
+    resultParam: { label: "Required Flow Rate", unitGroup: "flowRate", defaultUnit: "L/min" },
+    calculate: (v) => {
+      // bore in mm, speed in mm/s
+      const areaM2 = Math.PI * Math.pow(v.bore / 1000 / 2, 2);
+      const speedMs = v.speed / 1000;
+      const flowM3s = areaM2 * speedMs;
+      return flowM3s * 1000 * 60; // L/min
+    },
+  },
   // ─── Air Consumption ───
   {
     id: "air-consumption",
@@ -245,31 +304,9 @@ export const calculations: CalculationConfig[] = [
     calculate: (v) => {
       const d = v.pipeDiameter;
       const q = v.flowRate;
-      const l = v.pipeLength / 1000; // mm to m — wait, pipeLength is already in mm (base). Convert to m.
       const lm = v.pipeLength / 1000;
       const p = v.inletPressure;
       return (1.6e8 * Math.pow(q, 1.85) * lm) / (Math.pow(d, 5) * (p + 1.01325) * 1e5) * 1e5;
-    },
-  },
-  // ─── Valve Cv ───
-  {
-    id: "valve-flow-coefficient",
-    name: "Valve Flow Coefficient (Cv)",
-    category: "Valves",
-    description: "Calculate required valve flow coefficient for a given application.",
-    params: [
-      { id: "flowRate", label: "Required Flow Rate", unitGroup: "flowRate", defaultUnit: "L/min", placeholder: "e.g. 200" },
-      { id: "inletPressure", label: "Inlet Pressure", unitGroup: "pressure", defaultUnit: "bar", placeholder: "e.g. 7" },
-      { id: "pressureDrop", label: "Allowable Pressure Drop", unitGroup: "pressure", defaultUnit: "bar", placeholder: "e.g. 0.5" },
-    ],
-    resultParam: { label: "Flow Coefficient", unitGroup: "cv", defaultUnit: "Cv" },
-    calculate: (v) => {
-      const qScfm = v.flowRate * 0.03531;
-      const p1Psia = (v.inletPressure + 1.01325) * 14.696 / 1.01325;
-      const dpPsi = v.pressureDrop * 14.696 / 1.01325;
-      const sg = 1.0;
-      const t = 528;
-      return qScfm / (963 * Math.sqrt((dpPsi * (p1Psia - dpPsi / 2)) / (sg * t)));
     },
   },
   // ─── Compressor Capacity ───
