@@ -52,8 +52,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Footer */}
       <footer className="border-t py-6">
-        <div className="container text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} PneumaFlow Pro. Precision engineering tools.
+        <div className="container text-center text-sm text-muted-foreground space-y-1">
+          <p>© {new Date().getFullYear()} PneumaFlow Pro. Precision engineering tools.</p>
+          <p>
+            Desenvolvido por{" "}
+            <a href="https://ricardogomes.eu" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+              Ricardo Gomes
+            </a>
+            {" · "}
+            <a href="https://github.com/ricard0g0mes" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+              @ricard0g0mes
+            </a>
+          </p>
         </div>
       </footer>
     </div>
