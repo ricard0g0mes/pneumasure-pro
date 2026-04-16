@@ -15,9 +15,11 @@ import {
 } from "@/lib/calculations";
 import { addToHistory } from "@/lib/store";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "@/lib/i18n";
 
 export default function Index() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [selectedType, setSelectedType] = useState<CalculationType | "">("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
@@ -58,14 +60,12 @@ export default function Index() {
     setCalculating(true);
 
     setTimeout(() => {
-      // Convert all inputs to base units
       const baseValues: Record<string, number> = {};
       const inputLabels: Record<string, string> = {};
       const inputUnits: Record<string, string> = {};
       config.params.forEach((p) => {
         const raw = Number(values[p.id]);
         const unit = selectedUnits[p.id] || p.defaultUnit;
-        // For percentage, don't convert
         if (p.unitGroup === "percentage" || p.unitGroup === "rate") {
           baseValues[p.id] = raw;
         } else {
@@ -100,7 +100,6 @@ export default function Index() {
     }, 300);
   };
 
-  // Get result in currently selected display unit
   const displayResult = useMemo(() => {
     if (!result || !config) return null;
     const ug = config.resultParam.unitGroup;
@@ -109,7 +108,6 @@ export default function Index() {
     return convertFromBase(result.result, ug, unit);
   }, [result, config, resultUnit]);
 
-  // All result unit conversions
   const allResultConversions = useMemo(() => {
     if (!result || !config) return [];
     const ug = config.resultParam.unitGroup;
@@ -124,7 +122,6 @@ export default function Index() {
     }));
   }, [result, config]);
 
-  // Group calculations by category
   const categories = useMemo(() => {
     const cats: Record<string, typeof calculations> = {};
     calculations.forEach((c) => {
@@ -134,22 +131,46 @@ export default function Index() {
     return cats;
   }, []);
 
+  // Translation helpers for dynamic calc content
+  const calcName = (id: string) => t(`calc.${id}.name`);
+  const calcDesc = (id: string) => t(`calc.${id}.desc`);
+  const catName = (cat: string) => t(`cat.${cat}`);
+  const paramLabel = (paramId: string, fallback: string) => {
+    const key = `param.${paramId}`;
+    const val = t(key);
+    return val === key ? fallback : val;
+  };
+  const resultLabel = (configId: string) => {
+    // Map config result labels to translation keys
+    const map: Record<string, string> = {
+      "cylinder-force": "result.force",
+      "cylinder-bore-from-force": "result.bore",
+      "cylinder-pressure-from-force": "result.pressure",
+      "cylinder-advance-speed": "result.advanceSpeed",
+      "cylinder-retract-speed": "result.retractSpeed",
+      "cylinder-required-flow": "result.flowRate",
+      "cylinder-travel-time": "result.travelTime",
+      "cylinder-stroke-from-time": "result.stroke",
+      "air-consumption": "result.airConsumption",
+      "pipe-pressure-drop": "result.pressureDrop",
+      "compressor-capacity": "result.compressorCapacity",
+    };
+    const key = map[configId];
+    return key ? t(key) : config?.resultParam.label || "";
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-8">
-      {/* Hero */}
       <div className="text-center space-y-2">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-          Pneumatic Calculator
+          {t("index.title")}
         </h1>
-        <p className="text-muted-foreground">
-          Welcome back. Ready to optimize your pneumatic systems?
-        </p>
+        <p className="text-muted-foreground">{t("index.subtitle")}</p>
       </div>
 
-      {/* Calculation Type Selector */}
       <div className="space-y-3">
         <Label className="text-sm font-medium text-muted-foreground">
-          Select Calculation Type
+          {t("index.selectType")}
         </Label>
         <div className="relative">
           <select
@@ -157,12 +178,12 @@ export default function Index() {
             onChange={(e) => handleSelect(e.target.value as CalculationType)}
             className="w-full h-12 px-4 pr-10 rounded-lg border bg-card text-foreground text-sm font-medium appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
           >
-            <option value="">Choose a calculation...</option>
+            <option value="">{t("index.choose")}</option>
             {Object.entries(categories).map(([cat, calcs]) => (
-              <optgroup key={cat} label={cat}>
+              <optgroup key={cat} label={catName(cat)}>
                 {calcs.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {calcName(c.id)}
                   </option>
                 ))}
               </optgroup>
@@ -172,7 +193,6 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Input Fields */}
       <AnimatePresence mode="wait">
         {config && (
           <motion.div
@@ -183,7 +203,7 @@ export default function Index() {
             transition={{ duration: 0.3, ease: "easeOut" }}
             className="space-y-6"
           >
-            <p className="text-sm text-muted-foreground">{config.description}</p>
+            <p className="text-sm text-muted-foreground">{calcDesc(config.id)}</p>
 
             <div className="grid gap-4">
               {config.params.map((field, i) => {
@@ -198,7 +218,7 @@ export default function Index() {
                     className="space-y-1.5"
                   >
                     <Label htmlFor={field.id} className="text-sm font-medium">
-                      {field.label}
+                      {paramLabel(field.id, field.label)}
                     </Label>
                     <div className="flex gap-2">
                       <Input
@@ -258,7 +278,7 @@ export default function Index() {
               ) : (
                 <>
                   <Calculator className="mr-2 h-4 w-4" />
-                  Calculate Result
+                  {t("index.calculateBtn")}
                 </>
               )}
             </Button>
@@ -266,7 +286,6 @@ export default function Index() {
         )}
       </AnimatePresence>
 
-      {/* Result */}
       <AnimatePresence>
         {result && config && displayResult !== null && (
           <motion.div
@@ -276,7 +295,6 @@ export default function Index() {
             transition={{ duration: 0.35, ease: "easeOut" }}
             className="rounded-xl border bg-card p-8 space-y-6"
           >
-            {/* Primary result */}
             <div className="text-center space-y-1">
               {showSuccess && (
                 <motion.div
@@ -287,11 +305,10 @@ export default function Index() {
                   <Check className="h-5 w-5 text-accent-foreground" />
                 </motion.div>
               )}
-              <p className="text-sm text-muted-foreground">{result.resultLabel}</p>
+              <p className="text-sm text-muted-foreground">{resultLabel(config.id)}</p>
               <p className="text-4xl font-bold tracking-tight text-foreground">
                 {formatResult(displayResult)}
               </p>
-              {/* Result unit selector */}
               {allResultConversions.length > 1 ? (
                 <div className="flex items-center justify-center gap-2 pt-1">
                   <select
@@ -312,14 +329,13 @@ export default function Index() {
             </div>
 
             <p className="text-center text-sm text-muted-foreground">
-              Calculation complete. Precision achieved.
+              {t("index.complete")}
             </p>
 
-            {/* All unit conversions */}
             {allResultConversions.length > 1 && (
               <div className="border-t pt-4">
                 <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                  Result in all units
+                  {t("index.allUnits")}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {allResultConversions.map((c) => (
@@ -347,18 +363,17 @@ export default function Index() {
                 onClick={() => navigate("/history")}
                 className="w-full h-11"
               >
-                View History
+                {t("index.viewHistory")}
               </Button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Empty state */}
       {!selectedType && (
         <div className="text-center py-12 text-muted-foreground">
           <Calculator className="mx-auto h-12 w-12 mb-4 opacity-30" />
-          <p>Select a calculation type above to get started.</p>
+          <p>{t("index.emptyState")}</p>
         </div>
       )}
     </div>

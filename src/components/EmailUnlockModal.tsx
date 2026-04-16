@@ -4,6 +4,7 @@ import { X, Lock, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { setEmail } from "@/lib/store";
+import { useI18n } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function EmailUnlockModal({ open, onClose, onUnlocked }: Props) {
+  const { t } = useI18n();
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -21,7 +23,7 @@ export default function EmailUnlockModal({ open, onClose, onUnlocked }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) {
-      setError("Please enter a valid email address.");
+      setError(t("unlock.emailError"));
       return;
     }
     setEmail(value);
@@ -71,8 +73,8 @@ export default function EmailUnlockModal({ open, onClose, onUnlocked }: Props) {
                 <div className="h-16 w-16 rounded-full bg-accent flex items-center justify-center">
                   <Check className="h-8 w-8 text-accent-foreground" />
                 </div>
-                <p className="text-lg font-semibold text-foreground">History Unlocked!</p>
-                <p className="text-sm text-muted-foreground">Redirecting you now...</p>
+                <p className="text-lg font-semibold text-foreground">{t("unlock.success")}</p>
+                <p className="text-sm text-muted-foreground">{t("unlock.redirect")}</p>
               </motion.div>
             ) : (
               <>
@@ -81,10 +83,8 @@ export default function EmailUnlockModal({ open, onClose, onUnlocked }: Props) {
                     <Lock className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <h2 id="unlock-title" className="text-lg font-semibold">Unlock History</h2>
-                    <p id="unlock-desc" className="text-sm text-muted-foreground">
-                      Save your work, track progress, export data.
-                    </p>
+                    <h2 id="unlock-title" className="text-lg font-semibold">{t("unlock.title")}</h2>
+                    <p id="unlock-desc" className="text-sm text-muted-foreground">{t("unlock.desc")}</p>
                   </div>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -105,11 +105,9 @@ export default function EmailUnlockModal({ open, onClose, onUnlocked }: Props) {
                     )}
                   </div>
                   <Button type="submit" className="w-full h-12 text-base font-medium">
-                    Unlock Now
+                    {t("unlock.btn")}
                   </Button>
-                  <p className="text-xs text-muted-foreground text-center">
-                    We respect your privacy. No spam, ever.
-                  </p>
+                  <p className="text-xs text-muted-foreground text-center">{t("unlock.privacy")}</p>
                 </form>
               </>
             )}

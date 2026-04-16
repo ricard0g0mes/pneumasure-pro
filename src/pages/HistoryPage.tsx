@@ -6,10 +6,12 @@ import { getHistory, clearHistory, isUnlocked } from "@/lib/store";
 import { CalculationResult, formatResult } from "@/lib/calculations";
 import EmailUnlockModal from "@/components/EmailUnlockModal";
 import { useNavigate } from "react-router-dom";
+import { useI18n } from "@/lib/i18n";
 import jsPDF from "jspdf";
 
 export default function HistoryPage() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [history, setHistory] = useState<CalculationResult[]>([]);
   const [showUnlock, setShowUnlock] = useState(false);
   const unlocked = isUnlocked();
@@ -54,15 +56,11 @@ export default function HistoryPage() {
     return (
       <div className="max-w-lg mx-auto text-center space-y-6 py-16">
         <FileText className="mx-auto h-16 w-16 text-muted-foreground/30" />
-        <h1 className="text-2xl font-bold">Calculation History</h1>
-        <p className="text-muted-foreground">
-          No history yet? Perform your first calculation above.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Enter your email to unlock history tracking and PDF export.
-        </p>
+        <h1 className="text-2xl font-bold">{t("history.title")}</h1>
+        <p className="text-muted-foreground">{t("history.noHistory")}</p>
+        <p className="text-sm text-muted-foreground">{t("history.unlockDesc")}</p>
         <Button onClick={() => setShowUnlock(true)} className="h-11">
-          Unlock History
+          {t("history.unlock")}
         </Button>
         <EmailUnlockModal
           open={showUnlock}
@@ -80,19 +78,15 @@ export default function HistoryPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Calculation History</h1>
-          <p className="text-sm text-muted-foreground">{history.length} calculations saved</p>
+          <h1 className="text-2xl font-bold">{t("history.title")}</h1>
+          <p className="text-sm text-muted-foreground">{history.length} {t("history.saved")}</p>
         </div>
         <div className="flex gap-2">
           {history.length > 0 && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exportPdf(history)}
-              >
+              <Button variant="outline" size="sm" onClick={() => exportPdf(history)}>
                 <Download className="h-4 w-4 mr-1.5" />
-                Export All
+                {t("history.exportAll")}
               </Button>
               <Button
                 variant="outline"
@@ -103,7 +97,7 @@ export default function HistoryPage() {
                 }}
               >
                 <Trash2 className="h-4 w-4 mr-1.5" />
-                Clear
+                {t("history.clear")}
               </Button>
             </>
           )}
@@ -113,9 +107,9 @@ export default function HistoryPage() {
       {history.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Calculator className="mx-auto h-12 w-12 mb-4 opacity-30" />
-          <p>No calculations yet. Head to the calculator to get started.</p>
+          <p>{t("history.empty")}</p>
           <Button variant="outline" className="mt-4" onClick={() => navigate("/")}>
-            Go to Calculator
+            {t("history.goCalc")}
           </Button>
         </div>
       ) : (
