@@ -67,6 +67,16 @@ export const unitGroups: Record<string, UnitGroup> = {
     baseUnit: "cpm",
     units: [{ id: "cpm", label: "cpm", toBase: 1 }],
   },
+  time: {
+    id: "time",
+    name: "Time",
+    baseUnit: "s",
+    units: [
+      { id: "s", label: "s", toBase: 1 },
+      { id: "ms", label: "ms", toBase: 0.001 },
+      { id: "min", label: "min", toBase: 60 },
+    ],
+  },
   percentage: {
     id: "percentage",
     name: "Percentage",
@@ -136,6 +146,8 @@ export type CalculationType =
   | "cylinder-advance-speed"
   | "cylinder-retract-speed"
   | "cylinder-required-flow"
+  | "cylinder-travel-time"
+  | "cylinder-stroke-from-time"
   | "air-consumption"
   | "pipe-pressure-drop"
   | "compressor-capacity";
@@ -265,6 +277,38 @@ export const calculations: CalculationConfig[] = [
       const speedMs = v.speed / 1000;
       const flowM3s = areaM2 * speedMs;
       return flowM3s * 1000 * 60; // L/min
+    },
+  },
+  // ─── Cylinder Travel Time ───
+  {
+    id: "cylinder-travel-time",
+    name: "Cylinder Travel Time",
+    category: "Cylinder",
+    description: "Calculate time for a cylinder to complete its stroke given speed.",
+    params: [
+      { id: "stroke", label: "Stroke Length", unitGroup: "length", defaultUnit: "mm", placeholder: "e.g. 200" },
+      { id: "speed", label: "Piston Speed", unitGroup: "speed", defaultUnit: "mm/s", placeholder: "e.g. 300" },
+    ],
+    resultParam: { label: "Travel Time", unitGroup: "time", defaultUnit: "s" },
+    calculate: (v) => {
+      // stroke in mm, speed in mm/s → time in s
+      return v.stroke / v.speed;
+    },
+  },
+  // ─── Stroke from Travel Time ───
+  {
+    id: "cylinder-stroke-from-time",
+    name: "Stroke from Travel Time",
+    category: "Cylinder",
+    description: "Calculate maximum stroke length for a given travel time and speed.",
+    params: [
+      { id: "time", label: "Available Time", unitGroup: "time", defaultUnit: "s", placeholder: "e.g. 0.5" },
+      { id: "speed", label: "Piston Speed", unitGroup: "speed", defaultUnit: "mm/s", placeholder: "e.g. 300" },
+    ],
+    resultParam: { label: "Maximum Stroke", unitGroup: "length", defaultUnit: "mm" },
+    calculate: (v) => {
+      // time in s, speed in mm/s → stroke in mm
+      return v.time * v.speed;
     },
   },
   // ─── Air Consumption ───
