@@ -73,13 +73,16 @@ export const unitGroups: Record<string, UnitGroup> = {
     baseUnit: "%",
     units: [{ id: "%", label: "%", toBase: 1 }],
   },
-  cv: {
-    id: "cv",
-    name: "Flow Coefficient",
-    baseUnit: "Cv",
+  speed: {
+    id: "speed",
+    name: "Speed",
+    baseUnit: "mm/s",
     units: [
-      { id: "Cv", label: "Cv", toBase: 1 },
-      { id: "Kv", label: "Kv", toBase: 0.864 }, // Kv * 0.864 ≈ Cv (roughly)
+      { id: "mm/s", label: "mm/s", toBase: 1 },
+      { id: "cm/s", label: "cm/s", toBase: 10 },
+      { id: "m/s", label: "m/s", toBase: 1000 },
+      { id: "m/min", label: "m/min", toBase: 1000 / 60 },
+      { id: "in/s", label: "in/s", toBase: 25.4 },
     ],
   },
   airConsumption: {
@@ -130,9 +133,11 @@ export type CalculationType =
   | "cylinder-force"
   | "cylinder-bore-from-force"
   | "cylinder-pressure-from-force"
+  | "cylinder-advance-speed"
+  | "cylinder-retract-speed"
+  | "cylinder-required-flow"
   | "air-consumption"
   | "pipe-pressure-drop"
-  | "valve-flow-coefficient"
   | "compressor-capacity";
 
 export interface CalculationConfig {
